@@ -10,10 +10,12 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 
 stop_words = set(stopwords.words('english'))
+
 lemmatizer = WordNetLemmatizer()
 
 
 def clean_text(text):
+
     text = text.lower()
 
     text = re.sub(r'http\S+', '', text)
@@ -33,43 +35,66 @@ def clean_text(text):
     return " ".join(words)
 
 
-def extract_skills(annotation):
-    skills = []
+def extract_designation(annotation):
 
     for item in annotation:
-        if "Skills" in item["label"]:
-            for point in item["points"]:
-                skills.append(point["text"])
 
-    return " ".join(skills)
+        if "Designation" in item["label"]:
+
+            points = item.get("points", [])
+
+            if len(points) > 0:
+
+                return points[0]["text"].strip()
+
+    return "Unknown"
 
 
-def load_and_process_data():
-  with open("data/raw/resumes.json", "r", encoding="utf-8") as f:
+def load_json_lines(filepath):
 
     data = []
 
-    for line in f:
+    with open(filepath, "r", encoding="utf-8") as f:
 
-        line = line.strip()
+        for line in f:
 
-        if line:
-            data.append(json.loads(line))
+            line = line.strip()
+
+            if line:
+
+                try:
+                    data.append(json.loads(line))
+
+                except Exception as e:
+
+                    print("Error reading line:")
+                    print(e)
+
+    return data
+
+
+def load_and_process_data():
+
+    data = load_json_lines(
+        "data/raw/resumes.json"
+    )
 
     rows = []
 
     for item in data:
+
         content = item.get("content", "")
+
         annotation = item.get("annotation", [])
 
         cleaned = clean_text(content)
 
-        skills = extract_skills(annotation)
+        designation = extract_designation(annotation)
 
         rows.append({
             "resume": content,
             "cleaned_resume": cleaned,
-            "skills": skills
+            "designation": designation
         })
 
     df = pd.DataFrame(rows)
@@ -78,13 +103,18 @@ def load_and_process_data():
 
 
 if __name__ == "__main__":
+
     df = load_and_process_data()
 
+    print("\nFIRST 5 ROWS:")
     print(df.head())
+
+    print("\nCATEGORY COUNTS:")
+    print(df["designation"].value_counts())
 
     df.to_csv(
         "data/processed/cleaned_resumes.csv",
         index=False
     )
 
-    print("Saved cleaned dataset.")
+    print("\nSaved cleaned dataset.")
